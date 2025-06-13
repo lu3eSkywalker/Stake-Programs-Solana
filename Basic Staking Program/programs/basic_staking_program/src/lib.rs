@@ -36,7 +36,6 @@ pub mod basic_staking_program {
 
     pub fn stake(ctx: Context<Stake>, amount: u64) -> Result<()> {
 
-        let pda_account = &mut ctx.accounts.pda_account;
 
         let from_pubkey = ctx.accounts.user.to_account_info();
         let to_pubkey = ctx.accounts.pda_vault_account.to_account_info();
@@ -52,8 +51,12 @@ pub mod basic_staking_program {
 
         transfer(cpi_context, amount)?;
 
+        let pda_account = &mut ctx.accounts.pda_account;
+        let vault_pda_account = &mut ctx.accounts.pda_vault_account;
+        
         pda_account.staked_amount += amount;
-
+        vault_pda_account.total_staked_amount += amount;
+        
         Ok(())
     }
 }
