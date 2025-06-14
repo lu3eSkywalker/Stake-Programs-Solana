@@ -79,6 +79,42 @@ pub mod basic_staking_program {
         msg!("Staking Successfull");
         Ok(())
     }
+
+    pub fn unstake(ctx: Context<Unstake>, amount: u64) -> Result<()> {
+        require!(amount > 0, StakingError::InvalidAmount);
+
+        let pda_account = &mut ctx.accounts.pda_account;
+
+        require!(
+            pda_account.staked_amount > amount,
+            StakingError::InvalidBalance
+        );
+
+        let authority_key = ctx.accounts.authority.key();
+
+        // Transfer SOL from PDA back to user
+        let seeds = &[
+            b"pdaVault",
+            authority_key.as_ref(),
+            &[ctx.bumps.pda_vault_account],
+        ];
+        let signer = &[&seeds[..]];
+
+        let cpi_context = CpiContext::new_with_signer(
+            ctx.accounts.system_program.to_account_info(),
+            Transfer {
+                from: ctx.accounts.pda_vault_account.to_account_info(),
+                to: ctx.accounts.user.to_account_info(),
+            },
+            signer,
+        );
+        transfer(cpi_context, amount)?;
+
+        // Update Staked Amount
+        pda_account.staked_amount -= amount;
+
+        Ok(())
+    }
 }
 
 #[derive(Accounts)]
@@ -115,6 +151,31 @@ pub struct VaultPdaAccount<'info> {
 
 #[derive(Accounts)]
 pub struct Stake<'info> {
+    #[account(mut)]
+    pub user: Signer<'info>,
+
+    #[account(
+        mut,
+        seeds = [b"client1", user.key().as_ref()],
+        bump = pda_account.bump,
+        constraint = pda_account.owner == user.key()
+    )]
+    pub pda_account: Account<'info, StakeAccount>,
+
+    pub authority: AccountInfo<'info>,
+
+    #[account(
+        mut, 
+        seeds = [b"pdaVault", authority.key().as_ref()],
+        bump,
+    )]
+    pub pda_vault_account: SystemAccount<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct Unstake<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
 
