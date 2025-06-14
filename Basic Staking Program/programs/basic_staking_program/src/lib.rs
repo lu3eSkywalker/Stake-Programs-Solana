@@ -1,12 +1,12 @@
 use anchor_lang::prelude::*;
+use anchor_lang::system_program::{self, transfer, Transfer};
+use solana_program::program::invoke_signed;
+use solana_program::system_instruction;
 
-declare_id!("FGouhFiL9y9UsaFmYfnvEGjk7VWEWeYKxp9DEx4sPRGL");
+declare_id!("8y8S3RW35AuEj2N9B5RVB8jimLEmjbRDHk91Wzjant2h");
 
 #[program]
 pub mod basic_staking_program {
-    use anchor_lang::system_program::{transfer, Transfer};
-
-
     use super::*;
 
     pub fn create_pda_account(ctx: Context<CreatePdaAccount>) -> Result<()> {
@@ -24,19 +24,40 @@ pub mod basic_staking_program {
     }
 
     pub fn create_vault_pda_account(ctx: Context<VaultPdaAccount>) -> Result<()> {
-        let vault_pda_account = &mut ctx.accounts.pda_vault_account;
+        let rent = Rent::get()?;
+        let lamports = rent.minimum_balance(0); // 0 because SystemAccount has no data
+        let size = 0;
 
-        vault_pda_account.authority = ctx.accounts.authority.key();
-        vault_pda_account.total_staked_amount = 0;
-        vault_pda_account.bump = ctx.bumps.pda_vault_account;
+        let seeds = &[
+            b"pdaVault",
+            ctx.accounts.authority.key.as_ref(),
+            &[ctx.bumps.pda_vault_account],
+        ];
+        let signer_seeds = &[&seeds[..]];
 
-        msg!("PDA account created successfully");
+        let create_ix = system_instruction::create_account(
+            ctx.accounts.authority.key,
+            ctx.accounts.pda_vault_account.key,
+            lamports,
+            size,
+            &system_program::ID,
+        );
+
+        invoke_signed(
+            &create_ix,
+            &[
+                ctx.accounts.authority.to_account_info(),
+                ctx.accounts.pda_vault_account.to_account_info(),
+                ctx.accounts.system_program.to_account_info(),
+            ],
+            signer_seeds,
+        )?;
+
+        msg!("✅ PDA Vault System Account created successfully!");
         Ok(())
     }
 
     pub fn stake(ctx: Context<Stake>, amount: u64) -> Result<()> {
-
-
         let from_pubkey = ctx.accounts.user.to_account_info();
         let to_pubkey = ctx.accounts.pda_vault_account.to_account_info();
         let program_id = ctx.accounts.system_program.to_account_info();
@@ -52,11 +73,10 @@ pub mod basic_staking_program {
         transfer(cpi_context, amount)?;
 
         let pda_account = &mut ctx.accounts.pda_account;
-        let vault_pda_account = &mut ctx.accounts.pda_vault_account;
-        
+
         pda_account.staked_amount += amount;
-        vault_pda_account.total_staked_amount += amount;
-        
+
+        msg!("Staking Successfull");
         Ok(())
     }
 }
@@ -81,17 +101,14 @@ pub struct CreatePdaAccount<'info> {
 #[derive(Accounts)]
 pub struct VaultPdaAccount<'info> {
     #[account(mut)]
-    pub authority: AccountInfo<'info>,
+    pub authority: Signer<'info>,
 
     #[account(
-        init,
-        payer = authority,
-        space = 8 + 8 + 1 + 32,
+        mut,
         seeds = [b"pdaVault", authority.key().as_ref()],
         bump
     )]
-
-    pub pda_vault_account: Account<'info, VaultAccount>,
+    pub pda_vault_account: AccountInfo<'info>,
 
     pub system_program: Program<'info, System>,
 }
@@ -114,10 +131,9 @@ pub struct Stake<'info> {
     #[account(
         mut, 
         seeds = [b"pdaVault", authority.key().as_ref()],
-        bump = pda_vault_account.bump,
-        constraint = pda_vault_account.authority == authority.key()
+        bump,
     )]
-    pub pda_vault_account: Account<'info, VaultAccount>,
+    pub pda_vault_account: SystemAccount<'info>,
 
     pub system_program: Program<'info, System>,
 }
@@ -131,9 +147,11 @@ pub struct StakeAccount {
     pub bump: u8,
 }
 
-#[account]
-pub struct VaultAccount {
-    pub authority: Pubkey,
-    pub total_staked_amount: u64,
-    pub bump: u8
+#[error_code]
+pub enum StakingError {
+    #[msg("Amount must be greater than 0")]
+    InvalidAmount,
+
+    #[msg("Invalid Balance")]
+    InvalidBalance,
 }
