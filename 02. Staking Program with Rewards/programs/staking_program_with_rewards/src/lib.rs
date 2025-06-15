@@ -1,10 +1,13 @@
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::program::invoke_signed;
+use anchor_lang::solana_program::system_instruction;
 use anchor_lang::system_program;
 use anchor_lang::system_program::{transfer, Transfer};
-use anchor_lang::{solana_program::program::invoke_signed};
-use anchor_lang::{solana_program::system_instruction};
 
-declare_id!("GySypUZxaSBLUWXi7NvwUWkHjVEFx3F36o4KXmQWH3Ud");
+declare_id!("Hf3qwJ436dF49JgNAiJxyUEwGzN3miMRmZiJrFgNkKCv");
+
+const REWARD_RATE_PER_SOL_PER_SECOND: u64 = 1;
+const LAMPORTS_PER_SOL: u64 = 1_000_000_000;
 
 #[program]
 pub mod basic_staking_program {
@@ -26,7 +29,7 @@ pub mod basic_staking_program {
 
     pub fn create_vault_pda_account(ctx: Context<VaultPdaAccount>) -> Result<()> {
         let rent = Rent::get()?;
-        let lamports = rent.minimum_balance(0); // 0 because SystemAccount has no data
+        let lamports = rent.minimum_balance(0);
         let size = 0;
 
         let seeds = &[
@@ -77,6 +80,8 @@ pub mod basic_staking_program {
 
         pda_account.staked_amount += amount;
 
+        update_reward_points(pda_account);
+
         msg!("Staking Successfull");
         Ok(())
     }
@@ -116,6 +121,20 @@ pub mod basic_staking_program {
 
         Ok(())
     }
+}
+
+fn update_reward_points(pda_account: &mut StakeAccount) -> Result<()> {
+    let current_time = Clock::get()?.unix_timestamp;
+    let time_elapsed = (current_time - pda_account.last_update_time) as u64;
+
+    let rewards = (pda_account.staked_amount / LAMPORTS_PER_SOL)
+        * time_elapsed
+        * REWARD_RATE_PER_SOL_PER_SECOND;
+
+    pda_account.total_points += rewards;
+    pda_account.last_update_time = current_time;
+
+    Ok(())
 }
 
 #[derive(Accounts)]
