@@ -80,7 +80,7 @@ pub mod basic_staking_program {
 
         pda_account.staked_amount += amount;
 
-        update_reward_points(pda_account);
+        update_reward_points(pda_account)?;
 
         msg!("Staking Successfull");
         Ok(())
@@ -97,6 +97,8 @@ pub mod basic_staking_program {
         );
 
         let authority_key = ctx.accounts.authority.key();
+
+        update_reward_points(pda_account)?;
 
         // Transfer SOL from PDA back to user
         let seeds = &[
