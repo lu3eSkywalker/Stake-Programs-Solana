@@ -123,6 +123,17 @@ pub mod basic_staking_program {
 
         Ok(())
     }
+
+    pub fn claim_points(ctx: Context<ClaimPoints>) -> Result<()> {
+        let pda_account = &mut ctx.accounts.pda_account;
+
+        require!(pda_account.total_points > 0, StakingError::InvalidPoints);
+
+        pda_account.total_points = 0;
+
+        msg!("You have Claimed Your Points");
+        Ok(())
+    }
 }
 
 fn update_reward_points(pda_account: &mut StakeAccount) -> Result<()> {
@@ -150,6 +161,22 @@ pub struct CreatePdaAccount<'info> {
         space = 8 + 32 + 8 + 8 + 8 + 1, // discriminator + owner + staked_amount + total_points + last_update_time + bump
         seeds = [b"client1", payer.key().as_ref()],
         bump
+    )]
+    pub pda_account: Account<'info, StakeAccount>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct ClaimPoints<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+
+    #[account(
+        mut,
+        seeds = [b"client1", payer.key().as_ref()],
+        bump = pda_account.bump,
+        constraint = pda_account.owner == payer.key()
     )]
     pub pda_account: Account<'info, StakeAccount>,
 
@@ -237,4 +264,7 @@ pub enum StakingError {
 
     #[msg("Invalid Balance")]
     InvalidBalance,
+
+    #[msg("Insufficient Points")]
+    InvalidPoints,
 }
