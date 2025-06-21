@@ -1,12 +1,11 @@
 [toolchain]
-package_manager = "yarn"
 
 [features]
 resolution = true
 skip-lint = false
 
 [programs.devnet]
-stake_with_token_reward = "GZkqfcn7cWcnRXjZcPBQGm4aY19ggtQz8EbenbsnN4h6"
+stake_with_token_reward = "FV7mYYyx5FiDoaer7yzKaEJPfwCdRtj3feDuLwsJXWfk"
 
 [registry]
 url = "https://api.apr.dev"
