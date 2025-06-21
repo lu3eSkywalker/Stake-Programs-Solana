@@ -148,7 +148,7 @@ pub mod stake_with_token_reward {
 
         let current_time = Clock::get()?;
 
-        require!(current_time.unix_timestamp - pda_account_time >= 1 * 86400, StakingError::InvalidUnstake);
+        require!(current_time.unix_timestamp - pda_account_time >= 30 * 86400, StakingError::InvalidUnstake);
 
         let pda_account = &mut ctx.accounts.pda_account;
 
